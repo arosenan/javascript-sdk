@@ -90,7 +90,7 @@ export interface EntityListOptions<T, K extends keyof T = keyof T> {
 export interface EntityDistinctOptions<T, K extends keyof T = keyof T> {
   /** Field whose distinct values to return, in ascending order. Array fields contribute each element. */
   distinct: K;
-  /** Maximum number of values per page, up to 5,000. Defaults to 100. */
+  /** Maximum number of values per page, up to 1,000. Defaults to 100. */
   limit?: number;
   /** `next_cursor` from the previous page. Omit or pass `null` for the first page. The token carries the query and field. */
   cursor?: string | null;
