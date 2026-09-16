@@ -5,7 +5,6 @@ import {
   EntitiesModule,
   EntityAggregateResult,
   EntityAggregateSpec,
-  EntityDistinctResult,
   EntityFilterQuery,
   EntityHandler,
   EntityListOptions,
@@ -189,16 +188,6 @@ function createEntityHandler<T = any>(
       if (query) params.q = JSON.stringify(query);
       const result: { count: number } = await axios.get(`${baseURL}/count`, { params });
       return result.count;
-    },
-
-    // Distinct values of one field
-    async distinct<K extends keyof T & string>(
-      field: K,
-      query?: EntityFilterQuery<T>
-    ): Promise<EntityDistinctResult<T[K]>> {
-      const params: Record<string, string> = { field };
-      if (query) params.q = JSON.stringify(query);
-      return axios.get(`${baseURL}/distinct`, { params });
     },
 
     // Server-side group-by aggregation

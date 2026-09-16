@@ -3,7 +3,6 @@ import nock from "nock";
 import { createClient } from "../../src/index.ts";
 import type {
   EntityAggregateResult,
-  EntityDistinctResult,
   EntityPage,
   EntityUpsertResult,
 } from "../../src/modules/entities.types.ts";
@@ -114,19 +113,6 @@ describe("Entities scan-free primitives", () => {
       .reply(200, { count: 7 });
 
     expect(await base44.entities.Order.count()).toBe(7);
-    expect(scope.isDone()).toBe(true);
-  });
-
-  test("distinct() sends the field and optional filter", async () => {
-    const reply: EntityDistinctResult<string> = { values: ["a1", "a2"], truncated: false };
-    scope
-      .get(`${base}/distinct`)
-      .query((q) => q.field === "agent_id" && JSON.parse(q.q as string).status === "open")
-      .reply(200, reply);
-
-    const result = await base44.entities.Order.distinct("agent_id", { status: "open" });
-    expect(result.values).toEqual(["a1", "a2"]);
-    expect(result.truncated).toBe(false);
     expect(scope.isDone()).toBe(true);
   });
 

@@ -90,18 +90,6 @@ export interface EntityPage<T> {
 }
 
 /**
- * Result returned by {@linkcode EntityHandler.distinct | distinct()}.
- *
- * @typeParam V - Type of the field's values.
- */
-export interface EntityDistinctResult<V = any> {
-  /** The distinct values, unordered. */
-  values: V[];
-  /** `true` when the field has more than 5,000 distinct values and the list was cut. */
-  truncated: boolean;
-}
-
-/**
  * Time unit for {@linkcode EntityAggregateSpec.date_bucket | date_bucket}.
  */
 export type EntityDateBucketUnit = "day" | "week" | "month" | "year";
@@ -789,36 +777,6 @@ export interface EntityHandler<T = any> {
    * ```
    */
   count(query?: EntityFilterQuery<T>): Promise<number>;
-
-  /**
-   * Returns the distinct values of one field.
-   *
-   * Use it to fill dropdowns and autocomplete lists instead of loading every record
-   * and deduplicating in the browser. At most 5,000 values are returned; `truncated`
-   * tells you when the field has more. Not available on entities with field-level
-   * read rules.
-   *
-   * @typeParam K - The field to read.
-   * @param field - Name of the field.
-   * @param query - Filter query, in the same form {@linkcode filter | filter()} accepts. Defaults to all records.
-   * @returns Promise resolving to the values and a `truncated` flag.
-   *
-   * @example
-   * ```typescript
-   * // Brands available in the catalog
-   * const { values: brands } = await base44.entities.Product.distinct('brand');
-   * ```
-   *
-   * @example
-   * ```typescript
-   * // Cities of the active customers
-   * const { values } = await base44.entities.Customer.distinct('city', { status: 'active' });
-   * ```
-   */
-  distinct<K extends keyof T & string>(
-    field: K,
-    query?: EntityFilterQuery<T>,
-  ): Promise<EntityDistinctResult<T[K]>>;
 
   /**
    * Computes counts, sums, averages, minimums, maximums or distinct counts, grouped by fields.

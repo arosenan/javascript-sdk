@@ -22,7 +22,6 @@
   "EntityAggregateResult",
   "EntityAggregateSpec",
   "EntityDateBucketUnit",
-  "EntityDistinctResult",
   "EntityHandler",
   "EntityListOptions",
   "EntityPage",
