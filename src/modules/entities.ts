@@ -123,7 +123,7 @@ function createEntityHandler<T = any>(
       fields?: K[]
     ): Promise<any> {
       if (isListOptions(sortOrOptions)) {
-        return axios.get(`${baseURL}/page`, { params: pageParams(sortOrOptions) });
+        return axios.get(`${baseURL}/v2/list`, { params: pageParams(sortOrOptions) });
       }
       const params: Record<string, string | number> = {};
       if (sortOrOptions) params.sort = sortOrOptions;
@@ -145,7 +145,7 @@ function createEntityHandler<T = any>(
     ): Promise<any> {
       const q = JSON.stringify(query);
       if (isListOptions(sortOrOptions)) {
-        return axios.get(`${baseURL}/page`, { params: { q, ...pageParams(sortOrOptions) } });
+        return axios.get(`${baseURL}/v2/list`, { params: { q, ...pageParams(sortOrOptions) } });
       }
       const params: Record<string, string | number> = { q };
 

@@ -41,14 +41,14 @@ describe("Entities scan-free primitives", () => {
     nock.enableNetConnect();
   });
 
-  test("filter() with an options object reads a cursor page from /page", async () => {
+  test("filter() with an options object reads a cursor page from v2/list", async () => {
     const reply: EntityPage<Pick<Order, "id" | "amount">> = {
       items: [{ id: "1", amount: 10 }],
       next_cursor: "tok-2",
       has_more: true,
     };
     scope
-      .get(`${base}/page`)
+      .get(`${base}/v2/list`)
       .query((q) => {
         return (
           JSON.parse(q.q as string).status === "open" &&
@@ -73,7 +73,7 @@ describe("Entities scan-free primitives", () => {
 
   test("list() with an options object reads the first page when cursor is null", async () => {
     scope
-      .get(`${base}/page`)
+      .get(`${base}/v2/list`)
       .query((q) => q.sort === "amount" && q.cursor === undefined && q.q === undefined)
       .reply(200, { items: [], next_cursor: null, has_more: false });
 
