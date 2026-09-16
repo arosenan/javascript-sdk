@@ -64,14 +64,36 @@ export interface UpdateManyResult {
  * @typeParam K - The fields to include in each record.
  */
 export interface EntityListOptions<T, K extends keyof T = keyof T> {
-  /** Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`. Every page of one walk must use the same sort. */
+  /** Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`. */
   sort?: SortField<T>;
   /** Maximum number of records per page, up to 5,000. Defaults to 100. */
   limit?: number;
-  /** `next_cursor` from the previous page. Omit or pass `null` for the first page. */
+  /**
+   * `next_cursor` from the previous page. Omit or pass `null` for the first page.
+   *
+   * The token carries the query, sort and fields of the walk, so a later page needs only
+   * `cursor` and `limit`. Passing a different query, sort or fields with a cursor is an error.
+   */
   cursor?: string | null;
   /** Array of field names to include in each record. Defaults to all fields. */
   fields?: K[];
+}
+
+/**
+ * Options object accepted by {@linkcode EntityHandler.list | list()} and
+ * {@linkcode EntityHandler.filter | filter()} to read the distinct values of one field
+ * instead of records.
+ *
+ * @typeParam T - Entity record type.
+ * @typeParam K - The field whose distinct values to read.
+ */
+export interface EntityDistinctOptions<T, K extends keyof T = keyof T> {
+  /** Field whose distinct values to return, in ascending order. Array fields contribute each element. */
+  distinct: K;
+  /** Maximum number of values per page, up to 5,000. Defaults to 100. */
+  limit?: number;
+  /** `next_cursor` from the previous page. Omit or pass `null` for the first page. The token carries the query and field. */
+  cursor?: string | null;
 }
 
 /**
@@ -81,7 +103,7 @@ export interface EntityListOptions<T, K extends keyof T = keyof T> {
  * @typeParam T - Record type of the items.
  */
 export interface EntityPage<T> {
-  /** The page's records, in the requested sort order. */
+  /** The page's records in the requested sort order, or the distinct values in ascending order. */
   items: T[];
   /** Pass as `cursor` to get the next page. `null` on the last page. */
   next_cursor: string | null;
@@ -362,7 +384,7 @@ export interface EntityHandler<T = any> {
    * @param limit - Maximum number of results to return. Defaults to `5000`.
    * @param skip - Number of results to skip for pagination. Defaults to `0`. Deprecated for loops; use a cursor.
    * @param fields - Array of field names to include in the response. Defaults to all fields.
-   * @returns Promise resolving to an array of records with selected fields. When called with an options object, resolves instead to an {@linkcode EntityPage | EntityPage} with `items`, `next_cursor` and `has_more`.
+   * @returns Promise resolving to an array of records with selected fields. When called with an options object, resolves instead to an {@linkcode EntityPage | EntityPage} with `items`, `next_cursor` and `has_more`; with a `distinct` option the items are the field's values.
    *
    * @example
    * ```typescript
@@ -393,12 +415,18 @@ export interface EntityHandler<T = any> {
    * ```typescript
    * // Walk every record with a cursor. Pass an options object instead of
    * // positional arguments to get a page with `next_cursor` and `has_more`.
-   * let cursor: string | null = null;
-   * do {
-   *   const page = await base44.entities.MyEntity.list({ sort: '-created_date', limit: 1000, cursor });
+   * let page = await base44.entities.MyEntity.list({ sort: '-created_date', limit: 1000 });
+   * await exportRows(page.items);
+   * while (page.has_more) {
+   *   page = await base44.entities.MyEntity.list({ cursor: page.next_cursor, limit: 1000 });
    *   await exportRows(page.items);
-   *   cursor = page.next_cursor;
-   * } while (cursor);
+   * }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Distinct values of one field, instead of records
+   * const { items: categories } = await base44.entities.Product.list({ distinct: 'category' });
    * ```
    */
   list<K extends keyof T = keyof T>(
@@ -407,6 +435,9 @@ export interface EntityHandler<T = any> {
     skip?: number,
     fields?: K[],
   ): Promise<Pick<T, K>[]>;
+  list<K extends keyof T>(
+    options: EntityDistinctOptions<T, K>,
+  ): Promise<EntityPage<T[K]>>;
   list<K extends keyof T = keyof T>(
     options: EntityListOptions<T, K>,
   ): Promise<EntityPage<Pick<T, K>>>;
@@ -433,7 +464,7 @@ export interface EntityHandler<T = any> {
    * @param limit - Maximum number of results to return. Defaults to `5000`.
    * @param skip - Number of results to skip for pagination. Defaults to `0`. Deprecated for loops; use a cursor.
    * @param fields - Array of field names to include in the response. Defaults to all fields.
-   * @returns Promise resolving to an array of filtered records with selected fields. When called with an options object, resolves instead to an {@linkcode EntityPage | EntityPage} with `items`, `next_cursor` and `has_more`.
+   * @returns Promise resolving to an array of filtered records with selected fields. When called with an options object, resolves instead to an {@linkcode EntityPage | EntityPage} with `items`, `next_cursor` and `has_more`; with a `distinct` option the items are the field's values.
    *
    * @example
    * ```typescript
@@ -515,15 +546,24 @@ export interface EntityHandler<T = any> {
    * ```typescript
    * // Walk all matching records with a cursor. Pass an options object as the
    * // second argument to get a page with `next_cursor` and `has_more`.
-   * let cursor: string | null = null;
-   * do {
-   *   const page = await base44.entities.Order.filter(
-   *     { status: 'open' },
-   *     { sort: '-created_date', limit: 1000, cursor }
-   *   );
+   * let page = await base44.entities.Order.filter(
+   *   { status: 'open' },
+   *   { sort: '-created_date', limit: 1000 }
+   * );
+   * await exportRows(page.items);
+   * while (page.has_more) {
+   *   page = await base44.entities.Order.filter({ status: 'open' }, { cursor: page.next_cursor, limit: 1000 });
    *   await exportRows(page.items);
-   *   cursor = page.next_cursor;
-   * } while (cursor);
+   * }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Distinct values of one field among the matching records
+   * const { items: agents } = await base44.entities.Order.filter(
+   *   { status: 'open' },
+   *   { distinct: 'agent_id' }
+   * );
    * ```
    */
   filter<K extends keyof T = keyof T>(
@@ -533,6 +573,10 @@ export interface EntityHandler<T = any> {
     skip?: number,
     fields?: K[],
   ): Promise<Pick<T, K>[]>;
+  filter<K extends keyof T>(
+    query: EntityFilterQuery<T>,
+    options: EntityDistinctOptions<T, K>,
+  ): Promise<EntityPage<T[K]>>;
   filter<K extends keyof T = keyof T>(
     query: EntityFilterQuery<T>,
     options: EntityListOptions<T, K>,

@@ -81,6 +81,28 @@ describe("Entities scan-free primitives", () => {
     expect(scope.isDone()).toBe(true);
   });
 
+  test("a later page needs only the cursor: no q, sort or fields are sent", async () => {
+    scope
+      .get(`${base}/v2/list`)
+      .query((q) => q.cursor === "tok-1" && q.limit === "100" && q.q === undefined && q.sort === undefined && q.fields === undefined)
+      .reply(200, { items: [], next_cursor: null, has_more: false });
+
+    const page = await base44.entities.Order.list({ cursor: "tok-1" });
+    expect(page.has_more).toBe(false);
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("filter() with a distinct option reads a page of values from v2/list", async () => {
+    scope
+      .get(`${base}/v2/list`)
+      .query((q) => JSON.parse(q.q as string).status === "open" && q.distinct === "agent_id" && q.limit === "100" && q.sort === undefined)
+      .reply(200, { items: ["a1", "a2"], next_cursor: null, has_more: false });
+
+    const page = await base44.entities.Order.filter({ status: "open" }, { distinct: "agent_id" });
+    expect(page.items).toEqual(["a1", "a2"]);
+    expect(scope.isDone()).toBe(true);
+  });
+
   test("list() and filter() with positional arguments still return arrays from the list route", async () => {
     scope
       .get(base)

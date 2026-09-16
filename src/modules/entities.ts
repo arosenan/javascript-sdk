@@ -5,6 +5,7 @@ import {
   EntitiesModule,
   EntityAggregateResult,
   EntityAggregateSpec,
+  EntityDistinctOptions,
   EntityFilterQuery,
   EntityHandler,
   EntityListOptions,
@@ -83,7 +84,9 @@ function parseRealtimeMessage<T = any>(dataStr: string): RealtimeEvent<T> | null
 
 const DEFAULT_PAGE_LIMIT = 100;
 
-function isListOptions(value: unknown): value is EntityListOptions<any, any> {
+type PageOptions<T> = EntityListOptions<T, any> | EntityDistinctOptions<T, any>;
+
+function isPageOptions(value: unknown): value is PageOptions<any> {
   return typeof value === "object" && value !== null;
 }
 
@@ -125,14 +128,18 @@ function createEntityHandler<T = any>(
     return axios.get(baseURL, { params });
   };
 
-  // GET /{entity}/v2/list: one cursor page, shared by list(options) and filter(query, options)
-  const readPage = (options: EntityListOptions<T, any>, query?: EntityFilterQuery<T>) => {
+  // GET /{entity}/v2/list: one cursor page of records or distinct values, shared by list(options) and filter(query, options)
+  const readPage = (options: PageOptions<T>, query?: EntityFilterQuery<T>) => {
     const params: Record<string, string | number> = {};
     if (query) params.q = JSON.stringify(query);
-    if (options.sort) params.sort = options.sort;
     params.limit = options.limit || DEFAULT_PAGE_LIMIT;
     if (options.cursor) params.cursor = options.cursor;
-    if (options.fields) params.fields = fieldsParam(options.fields)!;
+    if ("distinct" in options) {
+      params.distinct = options.distinct;
+    } else {
+      if (options.sort) params.sort = options.sort;
+      if (options.fields) params.fields = fieldsParam(options.fields)!;
+    }
     return axios.get(`${baseURL}/v2/list`, { params });
   };
 
@@ -140,13 +147,13 @@ function createEntityHandler<T = any>(
     // list(sort, limit, skip, fields) returns an array; list(options) returns one cursor page.
     async list(...args: any[]): Promise<any> {
       const [sort, limit, skip, fields] = args;
-      return isListOptions(sort) ? readPage(sort) : readArray(sort, limit, skip, fields);
+      return isPageOptions(sort) ? readPage(sort) : readArray(sort, limit, skip, fields);
     },
 
     // filter(query, sort, limit, skip, fields) returns an array; filter(query, options) returns one cursor page.
     async filter(query: EntityFilterQuery<T>, ...args: any[]): Promise<any> {
       const [sort, limit, skip, fields] = args;
-      return isListOptions(sort) ? readPage(sort, query) : readArray(sort, limit, skip, fields, query);
+      return isPageOptions(sort) ? readPage(sort, query) : readArray(sort, limit, skip, fields, query);
     },
 
     // Get entity by ID
