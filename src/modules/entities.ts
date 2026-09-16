@@ -3,8 +3,15 @@ import {
   DeleteManyResult,
   DeleteResult,
   EntitiesModule,
+  EntityAggregateResult,
+  EntityAggregateSpec,
+  EntityDistinctResult,
   EntityFilterQuery,
   EntityHandler,
+  EntityListOptions,
+  EntityPage,
+  EntityUpsertOptions,
+  EntityUpsertResult,
   ImportResult,
   RealtimeCallback,
   RealtimeEvent,
@@ -75,6 +82,20 @@ function parseRealtimeMessage<T = any>(dataStr: string): RealtimeEvent<T> | null
   }
 }
 
+function isListOptions(value: unknown): value is EntityListOptions<any, any> {
+  return typeof value === "object" && value !== null;
+}
+
+function pageParams(options: EntityListOptions<any, any>): Record<string, string | number> {
+  const params: Record<string, string | number> = {};
+  if (options.sort) params.sort = options.sort;
+  if (options.limit) params.limit = options.limit;
+  if (options.cursor) params.cursor = options.cursor;
+  if (options.fields)
+    params.fields = Array.isArray(options.fields) ? options.fields.join(",") : options.fields;
+  return params;
+}
+
 /**
  * Creates a handler for a specific entity.
  *
@@ -94,15 +115,18 @@ function createEntityHandler<T = any>(
   const baseURL = `/apps/${appId}/entities/${entityName}`;
 
   return {
-    // List entities with optional pagination and sorting
+    // List entities. Positional args read one array; an options object reads one cursor page.
     async list<K extends keyof T = keyof T>(
-      sort?: SortField<T>,
+      sortOrOptions?: SortField<T> | EntityListOptions<T, K>,
       limit?: number,
       skip?: number,
       fields?: K[]
-    ): Promise<Pick<T, K>[]> {
+    ): Promise<any> {
+      if (isListOptions(sortOrOptions)) {
+        return axios.get(`${baseURL}/page`, { params: pageParams(sortOrOptions) });
+      }
       const params: Record<string, string | number> = {};
-      if (sort) params.sort = sort;
+      if (sortOrOptions) params.sort = sortOrOptions;
       if (limit) params.limit = limit;
       if (skip) params.skip = skip;
       if (fields)
@@ -111,19 +135,21 @@ function createEntityHandler<T = any>(
       return axios.get(baseURL, { params });
     },
 
-    // Filter entities based on query
+    // Filter entities. Positional args read one array; an options object reads one cursor page.
     async filter<K extends keyof T = keyof T>(
       query: EntityFilterQuery<T>,
-      sort?: SortField<T>,
+      sortOrOptions?: SortField<T> | EntityListOptions<T, K>,
       limit?: number,
       skip?: number,
       fields?: K[]
-    ): Promise<Pick<T, K>[]> {
-      const params: Record<string, string | number> = {
-        q: JSON.stringify(query),
-      };
+    ): Promise<any> {
+      const q = JSON.stringify(query);
+      if (isListOptions(sortOrOptions)) {
+        return axios.get(`${baseURL}/page`, { params: { q, ...pageParams(sortOrOptions) } });
+      }
+      const params: Record<string, string | number> = { q };
 
-      if (sort) params.sort = sort;
+      if (sortOrOptions) params.sort = sortOrOptions;
       if (limit) params.limit = limit;
       if (skip) params.skip = skip;
       if (fields)
@@ -165,6 +191,37 @@ function createEntityHandler<T = any>(
     // Update multiple entities matching a query using a MongoDB update operator
     async updateMany(query: Partial<T>, data: Record<string, Record<string, any>>): Promise<UpdateManyResult> {
       return axios.patch(`${baseURL}/update-many`, { query, data });
+    },
+
+    // Count entities matching a query
+    async count(query?: EntityFilterQuery<T>): Promise<number> {
+      const params: Record<string, string> = {};
+      if (query) params.q = JSON.stringify(query);
+      const result: { count: number } = await axios.get(`${baseURL}/count`, { params });
+      return result.count;
+    },
+
+    // Distinct values of one field
+    async distinct<K extends keyof T & string>(
+      field: K,
+      query?: EntityFilterQuery<T>
+    ): Promise<EntityDistinctResult<T[K]>> {
+      const params: Record<string, string> = { field };
+      if (query) params.q = JSON.stringify(query);
+      return axios.get(`${baseURL}/distinct`, { params });
+    },
+
+    // Server-side group-by aggregation
+    async aggregate(spec: EntityAggregateSpec<T>): Promise<EntityAggregateResult> {
+      return axios.post(`${baseURL}/aggregate`, spec);
+    },
+
+    // Create or update by a natural key
+    async upsert(
+      records: Partial<T>[],
+      options: EntityUpsertOptions<T>
+    ): Promise<EntityUpsertResult<T>> {
+      return axios.post(`${baseURL}/upsert`, { records, key: options.key });
     },
 
     // Update multiple entities by ID, each with its own update data

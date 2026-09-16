@@ -57,6 +57,125 @@ export interface UpdateManyResult {
 }
 
 /**
+ * Options object accepted by {@linkcode EntityHandler.list | list()} and
+ * {@linkcode EntityHandler.filter | filter()} to read one cursor page.
+ *
+ * @typeParam T - Entity record type.
+ * @typeParam K - The fields to include in each record.
+ */
+export interface EntityListOptions<T, K extends keyof T = keyof T> {
+  /** Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`. Every page of one walk must use the same sort. */
+  sort?: SortField<T>;
+  /** Maximum number of records per page, up to 5,000. Defaults to 5,000. */
+  limit?: number;
+  /** `next_cursor` from the previous page. Omit or pass `null` for the first page. */
+  cursor?: string | null;
+  /** Array of field names to include in each record. Defaults to all fields. */
+  fields?: K[];
+}
+
+/**
+ * One page of records, returned by {@linkcode EntityHandler.list | list()} and
+ * {@linkcode EntityHandler.filter | filter()} when called with an options object.
+ *
+ * @typeParam T - Record type of the items.
+ */
+export interface EntityPage<T> {
+  /** The page's records, in the requested sort order. */
+  items: T[];
+  /** Pass as `cursor` to get the next page. `null` on the last page. */
+  next_cursor: string | null;
+  /** Whether records remain after this page. */
+  has_more: boolean;
+}
+
+/**
+ * Result returned by {@linkcode EntityHandler.distinct | distinct()}.
+ *
+ * @typeParam V - Type of the field's values.
+ */
+export interface EntityDistinctResult<V = any> {
+  /** The distinct values, unordered. */
+  values: V[];
+  /** `true` when the field has more than 5,000 distinct values and the list was cut. */
+  truncated: boolean;
+}
+
+/**
+ * Time unit for {@linkcode EntityAggregateSpec.date_bucket | date_bucket}.
+ */
+export type EntityDateBucketUnit = "day" | "week" | "month" | "year";
+
+/**
+ * Describes what {@linkcode EntityHandler.aggregate | aggregate()} computes.
+ *
+ * Name the fields to group by and the measures to compute; the server does the work and
+ * returns one row per group. Field names are the entity's own field names.
+ *
+ * @typeParam T - Entity record type.
+ */
+export interface EntityAggregateSpec<T> {
+  /** Filter applied before grouping, in the same form {@linkcode EntityHandler.filter | filter()} accepts. Defaults to all records. */
+  match?: EntityFilterQuery<T>;
+  /** Field, or up to four fields, to group by. Omit to get one total row. */
+  group_by?: (keyof T & string) | (keyof T & string)[];
+  /** Group by a time bucket of a date field. `created_date` and `updated_date` support every unit; date fields of your schema support `day`, `month` and `year`. */
+  date_bucket?: { field: keyof T & string; unit: EntityDateBucketUnit };
+  /** Whether to include the number of records per group as `count`. Defaults to `true`. */
+  count?: boolean;
+  /** Field, or fields, to sum. Each appears in the rows as `sum_<field>`. */
+  sum?: (keyof T & string) | (keyof T & string)[];
+  /** Field, or fields, to average. Each appears in the rows as `avg_<field>`. */
+  avg?: (keyof T & string) | (keyof T & string)[];
+  /** Field, or fields, to take the minimum of. Each appears in the rows as `min_<field>`. */
+  min?: (keyof T & string) | (keyof T & string)[];
+  /** Field, or fields, to take the maximum of. Each appears in the rows as `max_<field>`. */
+  max?: (keyof T & string) | (keyof T & string)[];
+  /** Field whose distinct values to count per group, returned as `count_distinct_<field>`. Can't be combined with `count`, `sum`, `avg`, `min` or `max`. */
+  count_distinct?: keyof T & string;
+  /** Filter on the computed fields, applied after grouping. For example `{ count: { $gt: 1 } }` keeps only duplicated groups. */
+  having?: Record<string, any>;
+  /** Computed or group field to sort the rows by, with a `-` prefix for descending. For example `'-count'`. */
+  sort?: string;
+  /** Maximum number of rows, up to 1,000. Defaults to 1,000. */
+  limit?: number;
+}
+
+/**
+ * Rows returned by {@linkcode EntityHandler.aggregate | aggregate()}.
+ */
+export interface EntityAggregateResult {
+  /** One row per group: the group fields by name, then `count`, `sum_<field>`, `avg_<field>`, `min_<field>`, `max_<field>` or `count_distinct_<field>`. */
+  rows: Record<string, any>[];
+  /** `true` when more groups exist than `limit` allowed. */
+  truncated: boolean;
+}
+
+/**
+ * Options for {@linkcode EntityHandler.upsert | upsert()}.
+ *
+ * @typeParam T - Entity record type.
+ */
+export interface EntityUpsertOptions<T> {
+  /** Field, or fields, that identify a record. A record whose key values match an existing record updates it; any other record is created. */
+  key: (keyof T & string) | (keyof T & string)[];
+}
+
+/**
+ * Result returned by {@linkcode EntityHandler.upsert | upsert()}.
+ *
+ * @typeParam T - Entity record type.
+ */
+export interface EntityUpsertResult<T = any> {
+  /** Number of records that were created. */
+  created: number;
+  /** Number of existing records that were updated. */
+  updated: number;
+  /** The written records, created and updated, as they now exist. */
+  records: T[];
+}
+
+/**
  * Result returned when importing entities from a file.
  *
  * @typeParam T - The entity type for imported records. Defaults to `any`.
@@ -244,14 +363,18 @@ export interface EntityHandler<T = any> {
    * Retrieves all records of this type with support for sorting,
    * pagination, and field selection.
    *
-   * **Note:** The maximum limit is 5,000 items per request.
+   * **Note:** The maximum limit is 5,000 items per request. To read more than
+   * one page, pass an {@linkcode EntityListOptions | options object} with a
+   * `cursor` instead of `skip`: every page costs the same however deep you are,
+   * and records deleted between pages never shift the boundary. `skip` is kept
+   * for existing code and is deprecated for loops.
    *
    * @typeParam K - The fields to include in the response. Defaults to all fields.
    * @param sort - Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`.
-   * @param limit - Maximum number of results to return. Defaults to `50`.
-   * @param skip - Number of results to skip for pagination. Defaults to `0`.
+   * @param limit - Maximum number of results to return. Defaults to `5000`.
+   * @param skip - Number of results to skip for pagination. Defaults to `0`. Deprecated for loops; use a cursor.
    * @param fields - Array of field names to include in the response. Defaults to all fields.
-   * @returns Promise resolving to an array of records with selected fields.
+   * @returns Promise resolving to an array of records with selected fields. When called with an options object, resolves instead to an {@linkcode EntityPage | EntityPage} with `items`, `next_cursor` and `has_more`.
    *
    * @example
    * ```typescript
@@ -277,6 +400,18 @@ export interface EntityHandler<T = any> {
    * // Get only specific fields
    * const fields = await base44.entities.MyEntity.list('-created_date', 10, 0, ['name', 'status']);
    * ```
+   *
+   * @example
+   * ```typescript
+   * // Walk every record with a cursor. Pass an options object instead of
+   * // positional arguments to get a page with `next_cursor` and `has_more`.
+   * let cursor: string | null = null;
+   * do {
+   *   const page = await base44.entities.MyEntity.list({ sort: '-created_date', limit: 1000, cursor });
+   *   await exportRows(page.items);
+   *   cursor = page.next_cursor;
+   * } while (cursor);
+   * ```
    */
   list<K extends keyof T = keyof T>(
     sort?: SortField<T>,
@@ -284,6 +419,9 @@ export interface EntityHandler<T = any> {
     skip?: number,
     fields?: K[],
   ): Promise<Pick<T, K>[]>;
+  list<K extends keyof T = keyof T>(
+    options: EntityListOptions<T, K>,
+  ): Promise<EntityPage<Pick<T, K>>>;
 
   /**
    * Filters records based on a query.
@@ -291,7 +429,11 @@ export interface EntityHandler<T = any> {
    * Retrieves records that match specific criteria with support for
    * sorting, pagination, and field selection.
    *
-   * **Note:** The maximum limit is 5,000 items per request.
+   * **Note:** The maximum limit is 5,000 items per request. To read more than
+   * one page, pass an {@linkcode EntityListOptions | options object} with a
+   * `cursor` instead of `skip`: every page costs the same however deep you are,
+   * and records deleted between pages never shift the boundary. `skip` is kept
+   * for existing code and is deprecated for loops.
    *
    * @typeParam K - The fields to include in the response. Defaults to all fields.
    * @param query - Query object with field-value pairs. Each key should be a field name
@@ -300,10 +442,10 @@ export interface EntityHandler<T = any> {
    * for exact matches, `null` for null values, arrays as shorthand for matching any of the
    * provided values, or documented MongoDB query operators for advanced filtering.
    * @param sort - Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`.
-   * @param limit - Maximum number of results to return. Defaults to `50`.
-   * @param skip - Number of results to skip for pagination. Defaults to `0`.
+   * @param limit - Maximum number of results to return. Defaults to `5000`.
+   * @param skip - Number of results to skip for pagination. Defaults to `0`. Deprecated for loops; use a cursor.
    * @param fields - Array of field names to include in the response. Defaults to all fields.
-   * @returns Promise resolving to an array of filtered records with selected fields.
+   * @returns Promise resolving to an array of filtered records with selected fields. When called with an options object, resolves instead to an {@linkcode EntityPage | EntityPage} with `items`, `next_cursor` and `has_more`.
    *
    * @example
    * ```typescript
@@ -380,6 +522,21 @@ export interface EntityHandler<T = any> {
    *   ['name', 'priority']
    * );
    * ```
+   *
+   * @example
+   * ```typescript
+   * // Walk all matching records with a cursor. Pass an options object as the
+   * // second argument to get a page with `next_cursor` and `has_more`.
+   * let cursor: string | null = null;
+   * do {
+   *   const page = await base44.entities.Order.filter(
+   *     { status: 'open' },
+   *     { sort: '-created_date', limit: 1000, cursor }
+   *   );
+   *   await exportRows(page.items);
+   *   cursor = page.next_cursor;
+   * } while (cursor);
+   * ```
    */
   filter<K extends keyof T = keyof T>(
     query: EntityFilterQuery<T>,
@@ -388,6 +545,10 @@ export interface EntityHandler<T = any> {
     skip?: number,
     fields?: K[],
   ): Promise<Pick<T, K>[]>;
+  filter<K extends keyof T = keyof T>(
+    query: EntityFilterQuery<T>,
+    options: EntityListOptions<T, K>,
+  ): Promise<EntityPage<Pick<T, K>>>;
 
   /**
    * Gets a single record by ID.
@@ -604,6 +765,147 @@ export interface EntityHandler<T = any> {
     query: Partial<T>,
     data: Record<string, Record<string, any>>,
   ): Promise<UpdateManyResult>;
+
+  /**
+   * Counts the records that match a query.
+   *
+   * Returns the number of records the current user can read, without fetching them.
+   * Use it for totals, badges and "page N of M" instead of listing records and
+   * measuring the array.
+   *
+   * @param query - Filter query, in the same form {@linkcode filter | filter()} accepts. Defaults to all records.
+   * @returns Promise resolving to the number of matching records.
+   *
+   * @example
+   * ```typescript
+   * // How many tasks are still open?
+   * const open = await base44.entities.Task.count({ status: 'open' });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Total records in the entity
+   * const total = await base44.entities.Task.count();
+   * ```
+   */
+  count(query?: EntityFilterQuery<T>): Promise<number>;
+
+  /**
+   * Returns the distinct values of one field.
+   *
+   * Use it to fill dropdowns and autocomplete lists instead of loading every record
+   * and deduplicating in the browser. At most 5,000 values are returned; `truncated`
+   * tells you when the field has more. Not available on entities with field-level
+   * read rules.
+   *
+   * @typeParam K - The field to read.
+   * @param field - Name of the field.
+   * @param query - Filter query, in the same form {@linkcode filter | filter()} accepts. Defaults to all records.
+   * @returns Promise resolving to the values and a `truncated` flag.
+   *
+   * @example
+   * ```typescript
+   * // Brands available in the catalog
+   * const { values: brands } = await base44.entities.Product.distinct('brand');
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Cities of the active customers
+   * const { values } = await base44.entities.Customer.distinct('city', { status: 'active' });
+   * ```
+   */
+  distinct<K extends keyof T & string>(
+    field: K,
+    query?: EntityFilterQuery<T>,
+  ): Promise<EntityDistinctResult<T[K]>>;
+
+  /**
+   * Computes counts, sums, averages, minimums, maximums or distinct counts, grouped by fields.
+   *
+   * Use it for dashboards, leaderboards and reports instead of loading every record
+   * and adding up in the browser. The server groups the records you can read and
+   * returns one row per group, up to 1,000 rows.
+   *
+   * @param spec - What to group by and what to compute. See {@linkcode EntityAggregateSpec | EntityAggregateSpec}.
+   * @returns Promise resolving to the rows and a `truncated` flag.
+   *
+   * @example
+   * ```typescript
+   * // Sales per agent this month, biggest first
+   * const { rows } = await base44.entities.Sale.aggregate({
+   *   match: { sale_date: { $gte: '2026-09-01' } },
+   *   group_by: 'agent_id',
+   *   sum: 'amount',
+   *   sort: '-sum_amount'
+   * });
+   * // rows: [{ agent_id: 'a1', count: 42, sum_amount: 18250 }, ...]
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Records created per day
+   * const { rows } = await base44.entities.Visit.aggregate({
+   *   date_bucket: { field: 'created_date', unit: 'day' }
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Find duplicated external ids
+   * const { rows } = await base44.entities.Contact.aggregate({
+   *   group_by: 'external_id',
+   *   having: { count: { $gt: 1 } }
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Unique visitors per page
+   * const { rows } = await base44.entities.PageView.aggregate({
+   *   group_by: 'path',
+   *   count_distinct: 'session_id'
+   * });
+   * ```
+   */
+  aggregate(spec: EntityAggregateSpec<T>): Promise<EntityAggregateResult>;
+
+  /**
+   * Creates or updates records by a key of your own.
+   *
+   * Use this when you sync data from another system: name the field, or fields, that
+   * identify a record, and the server updates the records whose key already exists and
+   * creates the rest, in one call. You no longer need to list existing records to check
+   * for duplicates before writing.
+   *
+   * You can upsert up to 500 records per request. When two records in one call share a
+   * key, the last one wins. Updates merge the given fields into the existing record, like
+   * {@linkcode update | update()}.
+   *
+   * @param records - Array of record data objects. Each must carry a value for every key field.
+   * @param options - The key field or fields. See {@linkcode EntityUpsertOptions | EntityUpsertOptions}.
+   * @returns Promise resolving to the counts and the written records.
+   *
+   * @example
+   * ```typescript
+   * // Sync contacts from a CRM by their CRM id
+   * const result = await base44.entities.Contact.upsert(
+   *   crmContacts.map(c => ({ crm_id: c.id, name: c.name, email: c.email })),
+   *   { key: 'crm_id' }
+   * );
+   * console.log(`${result.created} new, ${result.updated} updated`);
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Compound key
+   * await base44.entities.Inventory.upsert(rows, { key: ['sku', 'warehouse'] });
+   * ```
+   */
+  upsert(
+    records: Partial<T>[],
+    options: EntityUpsertOptions<T>,
+  ): Promise<EntityUpsertResult<T>>;
 
   /**
    * Updates the specified records in a single request, each with its own data.
