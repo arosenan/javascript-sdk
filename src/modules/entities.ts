@@ -81,6 +81,8 @@ function parseRealtimeMessage<T = any>(dataStr: string): RealtimeEvent<T> | null
   }
 }
 
+const DEFAULT_PAGE_LIMIT = 100;
+
 function isListOptions(value: unknown): value is EntityListOptions<any, any> {
   return typeof value === "object" && value !== null;
 }
@@ -128,7 +130,7 @@ function createEntityHandler<T = any>(
     const params: Record<string, string | number> = {};
     if (query) params.q = JSON.stringify(query);
     if (options.sort) params.sort = options.sort;
-    if (options.limit) params.limit = options.limit;
+    params.limit = options.limit || DEFAULT_PAGE_LIMIT;
     if (options.cursor) params.cursor = options.cursor;
     if (options.fields) params.fields = fieldsParam(options.fields)!;
     return axios.get(`${baseURL}/v2/list`, { params });

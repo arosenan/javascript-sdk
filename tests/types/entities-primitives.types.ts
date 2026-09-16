@@ -14,8 +14,8 @@ interface Sale {
 }
 
 const perAgent = {
-  match: { sale_date: { $gte: "2026-09-01" } },
-  group_by: "agent_id",
+  query: { sale_date: { $gte: "2026-09-01" } },
+  groupBy: "agent_id",
   sum: ["amount"],
   avg: "amount",
   sort: "-sum_amount",
@@ -23,20 +23,20 @@ const perAgent = {
 } satisfies EntityAggregateSpec<Sale>;
 
 const perDay = {
-  date_bucket: { field: "created_date", unit: "day" },
-  count_distinct: "agent_id",
+  dateBucket: { field: "created_date", unit: "day" },
+  countDistinct: "agent_id",
 } satisfies EntityAggregateSpec<Sale>;
 
 const duplicates = {
-  group_by: ["agent_id", "store"],
+  groupBy: ["agent_id", "store"],
   having: { count: { $gt: 1 } },
 } satisfies EntityAggregateSpec<Sale>;
 
 // @ts-expect-error unknown field names are rejected
-const badGroup = { group_by: "region" } satisfies EntityAggregateSpec<Sale>;
+const badGroup = { groupBy: "region" } satisfies EntityAggregateSpec<Sale>;
 
 // @ts-expect-error unknown bucket unit
-const badUnit = { date_bucket: { field: "created_date", unit: "hour" } } satisfies EntityAggregateSpec<Sale>;
+const badUnit = { dateBucket: { field: "created_date", unit: "hour" } } satisfies EntityAggregateSpec<Sale>;
 
 const firstPage = {
   sort: "-created_date",

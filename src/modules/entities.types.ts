@@ -66,7 +66,7 @@ export interface UpdateManyResult {
 export interface EntityListOptions<T, K extends keyof T = keyof T> {
   /** Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`. Every page of one walk must use the same sort. */
   sort?: SortField<T>;
-  /** Maximum number of records per page, up to 5,000. Defaults to 5,000. */
+  /** Maximum number of records per page, up to 5,000. Defaults to 100. */
   limit?: number;
   /** `next_cursor` from the previous page. Omit or pass `null` for the first page. */
   cursor?: string | null;
@@ -90,7 +90,7 @@ export interface EntityPage<T> {
 }
 
 /**
- * Time unit for {@linkcode EntityAggregateSpec.date_bucket | date_bucket}.
+ * Time unit for {@linkcode EntityAggregateSpec.dateBucket | dateBucket}.
  */
 export type EntityDateBucketUnit = "day" | "week" | "month" | "year";
 
@@ -104,11 +104,11 @@ export type EntityDateBucketUnit = "day" | "week" | "month" | "year";
  */
 export interface EntityAggregateSpec<T> {
   /** Filter applied before grouping, in the same form {@linkcode EntityHandler.filter | filter()} accepts. Defaults to all records. */
-  match?: EntityFilterQuery<T>;
+  query?: EntityFilterQuery<T>;
   /** Field, or up to four fields, to group by. Omit to get one total row. */
-  group_by?: (keyof T & string) | (keyof T & string)[];
+  groupBy?: (keyof T & string) | (keyof T & string)[];
   /** Group by a time bucket of a date field. `created_date` and `updated_date` support every unit; date fields of your schema support `day`, `month` and `year`. */
-  date_bucket?: { field: keyof T & string; unit: EntityDateBucketUnit };
+  dateBucket?: { field: keyof T & string; unit: EntityDateBucketUnit };
   /** Whether to include the number of records per group as `count`. Defaults to `true`. */
   count?: boolean;
   /** Field, or fields, to sum. Each appears in the rows as `sum_<field>`. */
@@ -119,8 +119,8 @@ export interface EntityAggregateSpec<T> {
   min?: (keyof T & string) | (keyof T & string)[];
   /** Field, or fields, to take the maximum of. Each appears in the rows as `max_<field>`. */
   max?: (keyof T & string) | (keyof T & string)[];
-  /** Field whose distinct values to count per group, returned as `count_distinct_<field>`. Can't be combined with `count`, `sum`, `avg`, `min` or `max`. */
-  count_distinct?: keyof T & string;
+  /** Field whose distinct values to count per group, returned as `count_distinct_<field>`. */
+  countDistinct?: keyof T & string;
   /** Filter on the computed fields, applied after grouping. For example `{ count: { $gt: 1 } }` keeps only duplicated groups. */
   having?: Record<string, any>;
   /** Computed or group field to sort the rows by, with a `-` prefix for descending. For example `'-count'`. */
@@ -792,8 +792,8 @@ export interface EntityHandler<T = any> {
    * ```typescript
    * // Sales per agent this month, biggest first
    * const { rows } = await base44.entities.Sale.aggregate({
-   *   match: { sale_date: { $gte: '2026-09-01' } },
-   *   group_by: 'agent_id',
+   *   query: { sale_date: { $gte: '2026-09-01' } },
+   *   groupBy: 'agent_id',
    *   sum: 'amount',
    *   sort: '-sum_amount'
    * });
@@ -804,7 +804,7 @@ export interface EntityHandler<T = any> {
    * ```typescript
    * // Records created per day
    * const { rows } = await base44.entities.Visit.aggregate({
-   *   date_bucket: { field: 'created_date', unit: 'day' }
+   *   dateBucket: { field: 'created_date', unit: 'day' }
    * });
    * ```
    *
@@ -812,7 +812,7 @@ export interface EntityHandler<T = any> {
    * ```typescript
    * // Find duplicated external ids
    * const { rows } = await base44.entities.Contact.aggregate({
-   *   group_by: 'external_id',
+   *   groupBy: 'external_id',
    *   having: { count: { $gt: 1 } }
    * });
    * ```
@@ -821,8 +821,8 @@ export interface EntityHandler<T = any> {
    * ```typescript
    * // Unique visitors per page
    * const { rows } = await base44.entities.PageView.aggregate({
-   *   group_by: 'path',
-   *   count_distinct: 'session_id'
+   *   groupBy: 'path',
+   *   countDistinct: 'session_id'
    * });
    * ```
    */

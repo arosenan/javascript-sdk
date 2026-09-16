@@ -70,10 +70,10 @@ describe("Entities scan-free primitives", () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  test("list() with an options object reads the first page when cursor is null", async () => {
+  test("list() with an options object reads the first page when cursor is null, 100 rows by default", async () => {
     scope
       .get(`${base}/v2/list`)
-      .query((q) => q.sort === "amount" && q.cursor === undefined && q.q === undefined)
+      .query((q) => q.sort === "amount" && q.limit === "100" && q.cursor === undefined && q.q === undefined)
       .reply(200, { items: [], next_cursor: null, has_more: false });
 
     const page = await base44.entities.Order.list({ sort: "amount", cursor: null });
@@ -118,8 +118,8 @@ describe("Entities scan-free primitives", () => {
 
   test("aggregate() posts the spec as-is to /aggregate", async () => {
     const spec = {
-      match: { status: "paid" },
-      group_by: "agent_id",
+      query: { status: "paid" },
+      groupBy: "agent_id",
       sum: "amount",
       having: { count: { $gt: 1 } },
       sort: "-sum_amount",
