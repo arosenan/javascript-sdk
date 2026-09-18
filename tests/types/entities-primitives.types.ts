@@ -1,6 +1,5 @@
 import type {
   EntityAggregateSpec,
-  EntityPipelineStage,
   EntityDistinctOptions,
   EntityListOptions,
   EntityUpsertOptions,
@@ -82,12 +81,4 @@ async function inferred() {
   page.items[0].amount;
   return [s, n, id];
 }
-const stages = [
-  { $match: { store: "s1" } },
-  { $group: { _id: "$agent_id", total: { $sum: "$amount" } } },
-] satisfies EntityPipelineStage[];
-
-// @ts-expect-error a stage key must be a $operator
-const badStage = [{ match: { store: "s1" } }] satisfies EntityPipelineStage[];
-
-export { inferred, stages, badStage };
+export { inferred };

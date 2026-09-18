@@ -10,7 +10,6 @@ import {
   EntityHandler,
   EntityListOptions,
   EntityPage,
-  EntityPipelineStage,
   EntityUpsertOptions,
   EntityUpsertResult,
   ImportResult,
@@ -201,9 +200,8 @@ function createEntityHandler<T = any>(
     },
 
     // Server-side group-by aggregation
-    // aggregate(spec) posts the spec; aggregate(stages) posts { pipeline: stages }.
-    async aggregate(spec: EntityAggregateSpec<T> | EntityPipelineStage[]): Promise<EntityAggregateResult> {
-      return axios.post(`${baseURL}/aggregate`, Array.isArray(spec) ? { pipeline: spec } : spec);
+    async aggregate(spec: EntityAggregateSpec<T>): Promise<EntityAggregateResult> {
+      return axios.post(`${baseURL}/aggregate`, spec);
     },
 
     // Create or update by a natural key

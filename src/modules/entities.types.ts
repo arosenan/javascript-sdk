@@ -152,12 +152,6 @@ export interface EntityAggregateSpec<T> {
 }
 
 /**
- * One stage of a MongoDB aggregation pipeline, such as `{ $match: {...} }` or `{ $group: {...} }`,
- * accepted by {@linkcode EntityHandler.aggregate | aggregate()}. Field names are the entity's own.
- */
-export type EntityPipelineStage = Record<`$${string}`, unknown>;
-
-/**
  * Rows returned by {@linkcode EntityHandler.aggregate | aggregate()}.
  */
 export interface EntityAggregateResult {
@@ -835,17 +829,7 @@ export interface EntityHandler<T = any> {
    * and adding up in the browser. The server groups the records you can read and
    * returns one row per group, up to 1,000 rows.
    *
-   * For anything the spec cannot say, pass a MongoDB aggregation pipeline instead: an array
-   * of stages written in the entity's own field names (`amount`, `address.city`, `id`,
-   * `created_date`). Allowed stages are `$match`, `$group`, `$sort`, `$limit`, `$skip`,
-   * `$project`, `$count`, `$unwind`, `$addFields`, `$set`, `$unset`, `$sortByCount`,
-   * `$bucket`, `$bucketAuto`, `$replaceRoot` and `$replaceWith`, up to 20 of them; joins,
-   * writes, `$facet`, `$$ROOT` and server-side JavaScript are rejected. The pipeline runs on
-   * the records you can read and is not available on the `User` entity or on entities with
-   * field-level read rules. Rows that are still records come back in the same shape as
-   * `list()`; grouped rows are your own output.
-   *
-   * @param spec - What to group by and what to compute. See {@linkcode EntityAggregateSpec | EntityAggregateSpec}. Or an array of {@linkcode EntityPipelineStage | pipeline stages}.
+   * @param spec - What to group by and what to compute. See {@linkcode EntityAggregateSpec | EntityAggregateSpec}.
    * @returns Promise resolving to the rows and a `truncated` flag.
    *
    * @example
@@ -885,21 +869,8 @@ export interface EntityHandler<T = any> {
    *   countDistinct: 'session_id'
    * });
    * ```
-   *
-   * @example
-   * ```typescript
-   * // A raw pipeline: revenue per agent from paid deals, biggest first
-   * const { rows } = await base44.entities.Deal.aggregate([
-   *   { $match: { status: 'paid' } },
-   *   { $group: { _id: '$agent_id', total: { $sum: '$income' }, deals: { $sum: 1 } } },
-   *   { $sort: { total: -1 } },
-   *   { $limit: 10 }
-   * ]);
-   * // rows: [{ _id: 'a1', total: 310050, deals: 12 }, ...]
-   * ```
    */
   aggregate(spec: EntityAggregateSpec<T>): Promise<EntityAggregateResult>;
-  aggregate(pipeline: EntityPipelineStage[]): Promise<EntityAggregateResult>;
 
   /**
    * Creates or updates records by a key of your own.
