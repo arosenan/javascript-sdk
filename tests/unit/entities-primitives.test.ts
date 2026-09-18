@@ -158,6 +158,18 @@ describe("Entities scan-free primitives", () => {
     expect(scope.isDone()).toBe(true);
   });
 
+  test("aggregate() with an array posts it as a pipeline", async () => {
+    const pipeline = [
+      { $match: { status: "paid" } },
+      { $group: { _id: "$agent_id", total: { $sum: "$amount" } } },
+    ];
+    scope.post(`${base}/aggregate`, { pipeline } as nock.RequestBodyMatcher).reply(200, { rows: [{ _id: "a1", total: 5 }], truncated: false });
+
+    const result = await base44.entities.Order.aggregate(pipeline);
+    expect(result.rows[0]._id).toBe("a1");
+    expect(scope.isDone()).toBe(true);
+  });
+
   test("upsert() posts records and the key", async () => {
     const records = [
       { external_id: "x1", amount: 5 },

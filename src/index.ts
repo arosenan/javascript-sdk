@@ -49,6 +49,7 @@ export type {
   EntityHandler,
   EntityListOptions,
   EntityPage,
+  EntityPipelineStage,
   EntityRecord,
   EntityTypeRegistry,
   EntityUpsertOptions,
