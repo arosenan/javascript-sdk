@@ -181,4 +181,17 @@ describe("Entities scan-free primitives", () => {
     expect(result.records).toHaveLength(2);
     expect(scope.isDone()).toBe(true);
   });
+
+  test("a coded API error surfaces its code and message on the thrown error", async () => {
+    scope
+      .get(`${base}/v2/list`)
+      .query({ cursor: "stale", sort: "amount", limit: "100" })
+      .reply(400, { error: { code: "invalid_cursor", message: "Cursor was issued for a different sort", details: {} } });
+
+    const err = await base44.entities.Order.list({ cursor: "stale", sort: "amount" }).catch((e) => e);
+    expect(err.status).toBe(400);
+    expect(err.code).toBe("invalid_cursor");
+    expect(err.message).toBe("Cursor was issued for a different sort");
+    expect(scope.isDone()).toBe(true);
+  });
 });
