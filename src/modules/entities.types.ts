@@ -840,10 +840,11 @@ export interface EntityHandler<T = any> {
    * `created_date`). Allowed stages are `$match`, `$group`, `$sort`, `$limit`, `$skip`,
    * `$project`, `$count`, `$unwind`, `$addFields`, `$set`, `$unset`, `$sortByCount`,
    * `$bucket`, `$bucketAuto`, `$replaceRoot` and `$replaceWith`, up to 20 of them; joins,
-   * writes, `$facet`, `$$ROOT` and server-side JavaScript are rejected. The pipeline runs on
-   * the records you can read and is not available on the `User` entity or on entities with
-   * field-level read rules. Rows that are still records come back in the same shape as
-   * `list()`; grouped rows are your own output.
+   * writes, `$facet`, `$$ROOT`, `$getField` and server-side JavaScript are rejected. The
+   * pipeline runs on the records you can read, fields you may not read are removed before
+   * your first stage, and the `User` entity is not supported. A leading `$match` plus
+   * `$sort` is served by the entity's indexes like a `list()`. Rows that are still records
+   * come back in the same shape as `list()`; grouped rows are your own output.
    *
    * @param spec - What to group by and what to compute. See {@linkcode EntityAggregateSpec | EntityAggregateSpec}. Or an array of {@linkcode EntityPipelineStage | pipeline stages}.
    * @returns Promise resolving to the rows and a `truncated` flag.
